@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.datasets import load_iris
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+# ── Konfiguracja strony ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="🌸 Iris Explorer",
     page_icon="🌸",
@@ -15,250 +15,225 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Bootstrap 5 + CSS ─────────────────────────────────────────────────────────
+# ── Style CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
-    .stApp { background-color: #f0f4f8; }
-    section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #dee2e6; }
-    .stTabs [data-baseweb="tab-list"] { background: #ffffff; border-radius: 10px; padding: 4px; border: 1px solid #dee2e6; }
-    .stTabs [data-baseweb="tab"] { border-radius: 8px; font-weight: 600; color: #495057; }
-    .stTabs [aria-selected="true"] { background: #0d6efd !important; color: white !important; }
-    div[data-testid="stMetricValue"] { color: #0d6efd !important; font-weight: 700; }
-    h1,h2,h3 { color: #212529; }
+    .main { background-color: #f8f4ff; }
+    .metric-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+    h1 { color: #5b2d8e; }
+    h2, h3 { color: #7b3db5; }
+    .stTabs [data-baseweb="tab"] { font-size: 1rem; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Dane ──────────────────────────────────────────────────────────────────────
+# ── Dane ─────────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
     iris = load_iris()
-    df = pd.DataFrame(iris.data, columns=["Dł. kielicha", "Szer. kielicha", "Dł. płatka", "Szer. płatka"])
+    df = pd.DataFrame(iris.data, columns=iris.feature_names)
+    df.columns = ["Dł. kielicha (cm)", "Szer. kielicha (cm)", "Dł. płatka (cm)", "Szer. płatka (cm)"]
     df["Gatunek"] = pd.Categorical.from_codes(iris.target, ["Setosa", "Versicolor", "Virginica"])
     return df
 
 df = load_data()
-CECHY = ["Dł. kielicha", "Szer. kielicha", "Dł. płatka", "Szer. płatka"]
-KOLORY = {"Setosa": "#0d6efd", "Versicolor": "#198754", "Virginica": "#dc3545"}
 
-THEME = dict(
-    paper_bgcolor="white",
-    plot_bgcolor="#f8f9fa",
-    font=dict(color="#212529", family="system-ui, sans-serif"),
-    legend=dict(bgcolor="white", bordercolor="#dee2e6", borderwidth=1),
-    margin=dict(t=50, b=40, l=40, r=20),
-)
+KOLORY = {
+    "Setosa":     "#e63946",
+    "Versicolor": "#2a9d8f",
+    "Virginica":  "#e9c46a"
+}
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div class="text-center py-3">
-        <span style="font-size:2.5rem">🌸</span>
-        <h4 class="mt-2 mb-0 fw-bold text-primary">Iris Explorer</h4>
-        <small class="text-muted">Dashboard Edukacyjny</small>
-    </div>
-    <hr>
-    """, unsafe_allow_html=True)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Iris_versicolor_3.jpg/320px-Iris_versicolor_3.jpg", use_container_width=True)
+    st.markdown("## 🌸 Iris Explorer")
+    st.markdown("**Edukacyjny dashboard** do eksploracji klasycznego zbioru danych Iris.")
+    st.divider()
 
-    st.markdown("**🎯 Filtruj gatunki**")
-    gatunki = []
-    for g, kolor in KOLORY.items():
-        if st.checkbox(g, value=True, key=g):
-            gatunki.append(g)
+    gatunki = st.multiselect(
+        "Filtruj gatunki:",
+        options=["Setosa", "Versicolor", "Virginica"],
+        default=["Setosa", "Versicolor", "Virginica"]
+    )
 
-    st.markdown("""<hr>
-    <div class="card border-0 bg-light rounded-3 p-3">
-        <h6 class="fw-bold text-primary"><i class="bi bi-info-circle"></i> O zbiorze Iris</h6>
-        <small class="text-muted">
-            Klasyczny zbiór <strong>Ronalda Fishera</strong> z 1936 r.<br><br>
-            🔢 <strong>150</strong> próbek<br>
-            🌸 <strong>3</strong> gatunki<br>
-            📏 <strong>4</strong> cechy (cm)
-        </small>
-    </div>""", unsafe_allow_html=True)
+    st.divider()
+    st.markdown("### 📖 O zbiorze Iris")
+    st.info("""
+    Zbiór stworzony przez **Ronalda Fishera** w 1936 roku.
+    Zawiera **150 próbek** trzech gatunków irysów z 4 pomiarami każda.
+    Jeden z najbardziej znanych zbiorów w ML!
+    """)
 
-if not gatunki:
-    st.warning("Wybierz co najmniej jeden gatunek!")
-    st.stop()
-
-df_f = df[df["Gatunek"].isin(gatunki)]
-kolor_map = {g: KOLORY[g] for g in gatunki}
+df_filtered = df[df["Gatunek"].isin(gatunki)]
 
 # ── Nagłówek ─────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="card border-0 shadow-sm rounded-4 p-4 mb-3" style="background:linear-gradient(135deg,#0d6efd,#6610f2)">
-    <h1 class="text-white fw-bold mb-1">🌸 Iris Dataset Explorer</h1>
-    <p class="text-white-50 mb-0">Odkryj wzorce w klasycznym zbiorze danych Fishera • Edukacyjny Dashboard</p>
-</div>
-""", unsafe_allow_html=True)
+st.title("🌸 Iris Dataset — Edukacyjny Dashboard")
+st.markdown("Eksploruj klasyczny zbiór danych Fishera i odkryj różnice między gatunkami irysów.")
+st.divider()
 
-# ── KPI ───────────────────────────────────────────────────────────────────────
-k1, k2, k3, k4 = st.columns(4)
-kpis = [
-    ("bi-collection", "0d6efd", str(len(df_f)), "Próbek"),
-    ("bi-flower1",    "198754", str(df_f["Gatunek"].nunique()), "Gatunków"),
-    ("bi-rulers",     "dc3545", "4", "Cechy"),
-    ("bi-check-circle","fd7e14","100%", "Kompletność"),
-]
-for col, (icon, kolor, val, label) in zip([k1,k2,k3,k4], kpis):
-    col.markdown(f"""
-    <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100">
-        <i class="bi {icon} text-{kolor if kolor in ['primary','success','danger','warning'] else ''}"
-           style="font-size:1.8rem;color:#{kolor}"></i>
-        <div class="fw-bold fs-3 mt-1" style="color:#{kolor}">{val}</div>
-        <div class="text-muted small text-uppercase">{label}</div>
-    </div>
-    """, unsafe_allow_html=True)
+# ── Metryki ──────────────────────────────────────────────────────────────────
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("🌱 Próbek łącznie", len(df_filtered))
+c2.metric("🌸 Gatunków", df_filtered["Gatunek"].nunique())
+c3.metric("📏 Cech", 4)
+c4.metric("📊 Brak danych", "0")
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.divider()
 
-# ── Zakładki ──────────────────────────────────────────────────────────────────
+# ── Zakładki ─────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Rozkłady", "🔵 Scatter", "🌡️ Korelacje", "📦 Violin", "🔬 PCA"
+    "📊 Rozkłady", "🔵 Scatter Plot", "🌡️ Korelacje", "📦 Boxploty", "🔬 PCA"
 ])
 
-def insight(txt):
-    st.markdown(f"""
-    <div class="alert alert-primary border-0 rounded-3 mt-3 d-flex align-items-start gap-2">
-        <i class="bi bi-lightbulb-fill fs-5 text-warning mt-1"></i>
-        <div><strong>Wniosek:</strong> {txt}</div>
-    </div>""", unsafe_allow_html=True)
+cechy = df_filtered.columns[:-1].tolist()
 
-def card_header(title, desc):
-    st.markdown(f"""
-    <div class="mb-3">
-        <h4 class="fw-bold mb-1">{title}</h4>
-        <p class="text-muted mb-0">{desc}</p>
-    </div>""", unsafe_allow_html=True)
-
-# ══ TAB 1 ═════════════════════════════════════════════════════════════════════
+# ══ TAB 1 — Rozkłady ══════════════════════════════════════════════════════════
 with tab1:
-    card_header("Rozkłady cech", "Jak rozkładają się wartości każdej cechy? Czy gatunki się nakładają?")
-    fig = make_subplots(rows=2, cols=2, subplot_titles=CECHY,
-                        vertical_spacing=0.14, horizontal_spacing=0.08)
-    for (r,c), cecha in zip([(1,1),(1,2),(2,1),(2,2)], CECHY):
-        for g in gatunki:
-            fig.add_trace(go.Histogram(
-                x=df_f[df_f["Gatunek"]==g][cecha], name=g, legendgroup=g,
-                showlegend=(r==1 and c==1),
-                marker_color=KOLORY[g], opacity=0.7, nbinsx=15,
-                hovertemplate=f"<b>{g}</b><br>{cecha}: %{{x:.2f}}<br>Liczba: %{{y}}<extra></extra>"
-            ), row=r, col=c)
-    fig.update_layout(barmode="overlay", height=520, **THEME)
-    fig.update_xaxes(gridcolor="#e9ecef", zeroline=False)
-    fig.update_yaxes(gridcolor="#e9ecef", zeroline=False)
-    for ann in fig.layout.annotations:
-        ann.font = dict(size=12, color="#495057")
-    st.plotly_chart(fig, use_container_width=True)
-    insight("Setosa jest wyraźnie oddzielona od pozostałych — szczególnie w cechach płatka. Versicolor i Virginica częściowo się nakładają.")
+    st.subheader("Rozkłady cech dla każdego gatunku")
+    st.markdown("Histogramy pokazują jak rozkładają się wartości każdej cechy. Czy gatunki się nakładają?")
 
-# ══ TAB 2 ═════════════════════════════════════════════════════════════════════
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    fig.patch.set_facecolor("#f8f4ff")
+
+    for ax, cecha in zip(axes.flatten(), cechy):
+        for gatunek, kolor in KOLORY.items():
+            if gatunek in gatunki:
+                dane = df_filtered[df_filtered["Gatunek"] == gatunek][cecha]
+                ax.hist(dane, bins=15, alpha=0.6, color=kolor, label=gatunek, edgecolor="white")
+        ax.set_title(cecha, fontsize=11, fontweight="bold", color="#5b2d8e")
+        ax.set_xlabel("Wartość (cm)", fontsize=9)
+        ax.set_ylabel("Liczba próbek", fontsize=9)
+        ax.legend(fontsize=8)
+        ax.set_facecolor("#fdfbff")
+        ax.spines[["top", "right"]].set_visible(False)
+
+    plt.suptitle("Rozkłady cech Iris", fontsize=14, fontweight="bold", color="#5b2d8e", y=1.01)
+    plt.tight_layout()
+    st.pyplot(fig)
+    st.info("💡 **Wniosek:** Setosa jest wyraźnie oddzielona od pozostałych gatunków, szczególnie w cechach płatka.")
+
+# ══ TAB 2 — Scatter Plot ══════════════════════════════════════════════════════
 with tab2:
-    card_header("Wykres rozrzutu", "Wybierz dwie cechy i obserwuj jak gatunki separują się w przestrzeni 2D.")
+    st.subheader("Wykres rozrzutu — porównanie dwóch cech")
+
     col_a, col_b = st.columns(2)
-    osx = col_a.selectbox("Oś X", CECHY, index=2)
-    osy = col_b.selectbox("Oś Y", CECHY, index=3)
-    fig = px.scatter(df_f, x=osx, y=osy, color="Gatunek",
-                     color_discrete_map=kolor_map, symbol="Gatunek",
-                     hover_data=CECHY, marginal_x="violin", marginal_y="violin",
-                     title=f"<b>{osx}</b> vs <b>{osy}</b>")
-    fig.update_traces(marker=dict(size=9, opacity=0.85,
-                                  line=dict(width=0.5, color="white")))
-    fig.update_layout(height=560, **THEME)
-    fig.update_xaxes(gridcolor="#e9ecef")
-    fig.update_yaxes(gridcolor="#e9ecef")
-    st.plotly_chart(fig, use_container_width=True)
-    insight("Wybierz <b>Dł. płatka</b> i <b>Szer. płatka</b> — zobaczysz niemal idealne rozdzielenie trzech gatunków!")
+    with col_a:
+        osx = st.selectbox("Oś X:", cechy, index=2)
+    with col_b:
+        osy = st.selectbox("Oś Y:", cechy, index=3)
 
-# ══ TAB 3 ═════════════════════════════════════════════════════════════════════
+    fig, ax = plt.subplots(figsize=(9, 6))
+    fig.patch.set_facecolor("#f8f4ff")
+    ax.set_facecolor("#fdfbff")
+
+    for gatunek, kolor in KOLORY.items():
+        if gatunek in gatunki:
+            sub = df_filtered[df_filtered["Gatunek"] == gatunek]
+            ax.scatter(sub[osx], sub[osy], c=kolor, label=gatunek,
+                       alpha=0.8, s=80, edgecolors="white", linewidths=0.5)
+
+    ax.set_xlabel(osx, fontsize=11)
+    ax.set_ylabel(osy, fontsize=11)
+    ax.set_title(f"{osx} vs {osy}", fontsize=13, fontweight="bold", color="#5b2d8e")
+    ax.legend(fontsize=10)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout()
+    st.pyplot(fig)
+    st.info("💡 **Wskazówka:** Wybierz cechy płatka — zobaczysz idealne rozdzielenie gatunków!")
+
+# ══ TAB 3 — Heatmapa korelacji ════════════════════════════════════════════════
 with tab3:
-    card_header("Macierz korelacji", "Jak silnie powiązane są ze sobą cechy? Od -1 (odwrotna) do +1 (silna pozytywna).")
-    corr = df_f[CECHY].corr().round(2)
-    fig = go.Figure(go.Heatmap(
-        z=corr.values, x=corr.columns, y=corr.index,
-        colorscale=[[0,"#0d6efd"],[0.5,"#f8f9fa"],[1,"#dc3545"]],
-        zmin=-1, zmax=1,
-        text=corr.values, texttemplate="%{text}",
-        textfont=dict(size=13, color="#212529"),
-        hovertemplate="%{x} × %{y}<br>Korelacja: <b>%{z}</b><extra></extra>",
-        colorbar=dict(
-            title=dict(text="Korelacja", font=dict(color="#212529")),
-            tickfont=dict(color="#212529")
-        )
-    ))
-    fig.update_layout(height=460,
-                      title="Macierz korelacji Pearsona",
-                      title_font=dict(size=15, color="#212529"),
-                      **THEME)
-    st.plotly_chart(fig, use_container_width=True)
-    insight("Długość i szerokość płatka są <b>bardzo silnie skorelowane (0.96)</b> — prawie zawsze rosną razem.")
+    st.subheader("Macierz korelacji cech")
+    st.markdown("Korelacja pokazuje jak silnie dwie cechy są ze sobą powiązane (od -1 do 1).")
 
-# ══ TAB 4 ═════════════════════════════════════════════════════════════════════
+    fig, ax = plt.subplots(figsize=(8, 6))
+    fig.patch.set_facecolor("#f8f4ff")
+    corr = df_filtered[cechy].corr()
+
+    sns.heatmap(
+        corr, annot=True, fmt=".2f", cmap="RdYlGn",
+        ax=ax, linewidths=0.5, linecolor="white",
+        annot_kws={"size": 11, "weight": "bold"},
+        vmin=-1, vmax=1, square=True
+    )
+    ax.set_title("Korelacja między cechami", fontsize=13, fontweight="bold", color="#5b2d8e", pad=15)
+    plt.tight_layout()
+    st.pyplot(fig)
+    st.info("💡 **Wniosek:** Długość i szerokość płatka są silnie skorelowane (0.96) — im dłuższy płatek, tym szerszy.")
+
+# ══ TAB 4 — Boxploty ══════════════════════════════════════════════════════════
 with tab4:
-    card_header("Violin + Box", "Rozkład gęstości, mediana, kwartyle i wartości odstające w jednym wykresie.")
-    fig = make_subplots(rows=1, cols=4, subplot_titles=CECHY, horizontal_spacing=0.06)
-    for i, cecha in enumerate(CECHY, 1):
-        for g in gatunki:
-            fig.add_trace(go.Violin(
-                y=df_f[df_f["Gatunek"]==g][cecha], name=g, legendgroup=g,
-                showlegend=(i==1),
-                fillcolor=KOLORY[g], line_color=KOLORY[g],
-                opacity=0.7, box_visible=True,
-                meanline_visible=True, meanline_color="#212529",
-                points="outliers",
-                hovertemplate=f"<b>{g}</b><br>{cecha}: %{{y:.2f}}<extra></extra>"
-            ), row=1, col=i)
-    fig.update_layout(violinmode="group", height=480, **THEME)
-    for ann in fig.layout.annotations:
-        ann.font = dict(size=11, color="#495057")
-    fig.update_yaxes(gridcolor="#e9ecef", zeroline=False)
-    st.plotly_chart(fig, use_container_width=True)
-    insight("Setosa ma wąski, skupiony rozkład płatków. Virginica jest najbardziej zróżnicowana.")
+    st.subheader("Boxploty — rozkład i wartości odstające")
+    st.markdown("Boxplot pokazuje medianę, kwartyle i wartości odstające dla każdego gatunku.")
 
-# ══ TAB 5 ═════════════════════════════════════════════════════════════════════
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    fig.patch.set_facecolor("#f8f4ff")
+
+    for ax, cecha in zip(axes.flatten(), cechy):
+        dane_box = [df_filtered[df_filtered["Gatunek"] == g][cecha].values
+                    for g in gatunki]
+        bp = ax.boxplot(dane_box, labels=gatunki, patch_artist=True,
+                        medianprops=dict(color="black", linewidth=2))
+        for patch, g in zip(bp["boxes"], gatunki):
+            patch.set_facecolor(KOLORY[g])
+            patch.set_alpha(0.7)
+        ax.set_title(cecha, fontsize=11, fontweight="bold", color="#5b2d8e")
+        ax.set_ylabel("Wartość (cm)", fontsize=9)
+        ax.set_facecolor("#fdfbff")
+        ax.spines[["top", "right"]].set_visible(False)
+
+    plt.suptitle("Boxploty cech Iris", fontsize=14, fontweight="bold", color="#5b2d8e", y=1.01)
+    plt.tight_layout()
+    st.pyplot(fig)
+    st.info("💡 **Wniosek:** Setosa ma wyraźnie mniejsze płatki — pudełka w ogóle się nie nakładają!")
+
+# ══ TAB 5 — PCA ═══════════════════════════════════════════════════════════════
 with tab5:
-    card_header("PCA — Redukcja wymiarowości", "PCA kompresuje 4 cechy do 2 wymiarów zachowując maksimum informacji.")
-    X = StandardScaler().fit_transform(df_f[CECHY])
+    st.subheader("PCA — redukcja wymiarowości do 2D")
+    st.markdown("""
+    **PCA (Principal Component Analysis)** redukuje 4 cechy do 2 głównych składowych,
+    zachowując jak najwięcej informacji. Dzięki temu możemy zobaczyć dane w 2D.
+    """)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(df_filtered[cechy])
     pca = PCA(n_components=2)
-    coords = pca.fit_transform(X)
+    components = pca.fit_transform(X_scaled)
     var = pca.explained_variance_ratio_ * 100
 
-    df_pca = pd.DataFrame({"PC1": coords[:,0], "PC2": coords[:,1],
-                            "Gatunek": df_f["Gatunek"].values,
-                            **{c: df_f[c].values for c in CECHY}})
+    fig, ax = plt.subplots(figsize=(9, 6))
+    fig.patch.set_facecolor("#f8f4ff")
+    ax.set_facecolor("#fdfbff")
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        fig = px.scatter(df_pca, x="PC1", y="PC2", color="Gatunek",
-                         color_discrete_map=kolor_map, symbol="Gatunek",
-                         hover_data=CECHY,
-                         title=f"PCA — łącznie <b>{var[0]+var[1]:.1f}%</b> wariancji")
-        fig.update_traces(marker=dict(size=10, opacity=0.85,
-                                      line=dict(width=0.5, color="white")))
-        fig.update_layout(height=460,
-                          xaxis_title=f"PC1 ({var[0]:.1f}%)",
-                          yaxis_title=f"PC2 ({var[1]:.1f}%)",
-                          **THEME)
-        fig.update_xaxes(gridcolor="#e9ecef")
-        fig.update_yaxes(gridcolor="#e9ecef")
-        st.plotly_chart(fig, use_container_width=True)
+    for gatunek, kolor in KOLORY.items():
+        if gatunek in gatunki:
+            idx = df_filtered["Gatunek"].values == gatunek
+            ax.scatter(components[idx, 0], components[idx, 1],
+                       c=kolor, label=gatunek, alpha=0.85, s=90,
+                       edgecolors="white", linewidths=0.5)
 
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.metric("PC1", f"{var[0]:.1f}%", "wariancji")
-        st.metric("PC2", f"{var[1]:.1f}%", "wariancji")
-        st.metric("Łącznie", f"{var[0]+var[1]:.1f}%", "zachowane")
-        st.markdown("**Ładunki PCA:**")
-        loadings = pd.DataFrame(pca.components_.T, index=CECHY,
-                                 columns=["PC1","PC2"]).round(2)
-        st.dataframe(loadings, use_container_width=True)
+    ax.set_xlabel(f"PC1 ({var[0]:.1f}% wariancji)", fontsize=11)
+    ax.set_ylabel(f"PC2 ({var[1]:.1f}% wariancji)", fontsize=11)
+    ax.set_title("PCA — Iris w przestrzeni 2D", fontsize=13, fontweight="bold", color="#5b2d8e")
+    ax.legend(fontsize=10)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout()
+    st.pyplot(fig)
 
-    insight(f"Dwie pierwsze składowe wyjaśniają <b>{var[0]+var[1]:.1f}%</b> zmienności. Setosa jest idealnie odizolowana od pozostałych gatunków!")
+    col1, col2 = st.columns(2)
+    col1.metric("PC1 wyjaśnia", f"{var[0]:.1f}% wariancji")
+    col2.metric("PC2 wyjaśnia", f"{var[1]:.1f}% wariancji")
+    st.info(f"💡 **Wniosek:** Dwie pierwsze składowe wyjaśniają łącznie **{var[0]+var[1]:.1f}%** całej zmienności danych!")
 
 # ── Stopka ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="card border-0 bg-white shadow-sm rounded-4 p-3 mt-3 text-center text-muted small">
-    🌸 Iris Dataset Explorer &nbsp;•&nbsp; Dane: R.A. Fisher (1936) &nbsp;•&nbsp; Zbudowany z ❤️ w Streamlit + Plotly + Bootstrap 5
-</div>
-""", unsafe_allow_html=True)
+st.divider()
+st.markdown(
+    "<center style='color:#aaa; font-size:0.85rem'>🌸 Iris Dashboard • Dane: R.A. Fisher (1936) • Zbudowany w Streamlit</center>",
+    unsafe_allow_html=True
+)
